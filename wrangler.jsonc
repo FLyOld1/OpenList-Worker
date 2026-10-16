@@ -2,8 +2,8 @@
 // OpenList-TSWorker · Cloudflare Workers 配置
 // 文档：https://developers.cloudflare.com/workers/wrangler/configuration/
 //
-// ⚠️ 本文件只声明 KV 一个存储绑定（见文件末 kv_namespaces），D1 / DO 等
-//    其它存储请按需在控制台添加。
+// 本配置启用 D1（绑定名 DB）和 R2（绑定名 R2）。
+// 部署前替换下方 D1 Database ID，并确认数据库名称与 R2 桶名。
 //
 // 为什么声明 KV 且【省略 id 字段】（不能写 "id": ""）：
 //   wrangler 会自动预配（automatic provisioning）：首次部署创建
@@ -23,11 +23,11 @@
 // 用户填入的值会成为该 Worker 的 Secret，后续更新不会被覆盖。
 // =============================================================================
 {
-  "name": "openlist-tsworkers",
+  "name": "my-webdav",
   "main": "src/backend/worker.ts",
   "compatibility_date": "2026-08-04",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": false,
+  "workers_dev": true,
   "preview_urls": false,
 
   // ⚠️ run_worker_first 只放行 HTML 入口，不能改成 true（全量放行）：
@@ -53,7 +53,7 @@
     //   map（默认）- 整对象序列化为单个 JSON 键值，适合 KV/Blob
     //   key        - 分 key 存储，每实体一条记录（如 users_1）
     //   sql        - 关系表格式，与 Go 后端一致（适用于 D1/MySQL）
-    "DB_FORMAT": "map",
+    "DB_FORMAT": "sql",
 
     // 数据库驱动：
     //   auto（默认）- 自动检测，顺序 mysql → d1 → kv → cfkv → blob → do
@@ -64,7 +64,7 @@
     //   do         - Cloudflare Durable Objects（需下方 durable_objects）
     //   mysql      - 外部 MySQL（需 MYSQL_URLS 或 MYSQL_HOST 等，仅 Node 运行时）
     // 说明：mysql 仅在配置了连接信息时才参与 auto 探测，避免无谓的 TCP 建连。
-    "DB_DRIVER": "auto",
+    "DB_DRIVER": "d1",
 
     // 敏感字段落盘算法（默认 none：不加密；与 DB_DRIVER/DB_FORMAT 正交）：
     //   none（默认）              - 不加密，敏感字段明文落盘
@@ -208,7 +208,7 @@
   // 存储绑定
   // ===========================================================================
   //
-  // ▶ 方案 A：KV（默认启用，免费额度大、最通用）
+  // ▶ 方案 A：KV（可选；本配置使用 D1，未启用 KV）
   //   ⚠️ 必须【完全省略 id 字段】，不能写成 "id": ""：
   //      wrangler 配置校验会拒绝空字符串 id（"should have a string id field"）。
   //   省略 id 后：首次部署由 wrangler 自动创建 openlist-tsworkers-kv 并绑定；
@@ -253,4 +253,20 @@
   // "r2_buckets": [
   //   { "binding": "R2", "bucket_name": "your-bucket" }
   // ],
+
+  // 实际启用的存储绑定：名称需与 Cloudflare 控制台中的资源一致。
+  // database_id 必须替换为你已经创建的 D1 数据库 ID。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "openlist-db",
+      "database_id": "840e3261-79ff-46e2-9cd3-a06e23e650cb"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "openlist-files"
+    }
+  ]
 }
