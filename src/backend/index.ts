@@ -1,4 +1,5 @@
 import { Hono } from "hono"
+import { cors } from "hono/cors"
 import { setupRouter } from "./server/router"
 import { rawRouter } from "./server/raw"
 import { assetsRouter, getIndexHtmlWithCdn, isCdnConfigured, cdnAssetRedirect } from "./server/assets"
@@ -9,6 +10,36 @@ import { getStoreConfigErrorDetail } from "./internal/model/store/backend"
 import { storageErrorSummary, uiStorageError } from "./server/storage-error"
 
 const app = new Hono()
+
+// Browser WebDAV requests and download redirects use the ALLOW_URLS origin allowlist.
+const webdavCors = cors({
+  origin: (origin, c) => {
+    if (!origin) return null
+    const allowedOrigins = String(Reflect.get(c.env || {}, "ALLOW_URLS") || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+    return origin === new URL(c.req.url).origin || allowedOrigins.includes(origin)
+      ? origin
+      : null
+  },
+  allowMethods: ["GET", "HEAD", "OPTIONS", "PROPFIND", "PUT", "MKCOL", "DELETE", "MOVE", "COPY"],
+  allowHeaders: [
+    "Authorization", "Content-Type", "Depth", "Destination", "Overwrite",
+    "If", "If-Match", "If-None-Match", "Range", "Lock-Token", "Timeout",
+    "X-Requested-With",
+  ],
+  exposeHeaders: [
+    "Content-Length", "Content-Type", "ETag", "DAV", "Allow", "Lock-Token",
+    "Content-Range", "Accept-Ranges", "Last-Modified", "WWW-Authenticate",
+  ],
+  credentials: true,
+  maxAge: 600,
+})
+
+for (const path of ["/dav", "/dav/*", "/d/*", "/sd/*", "/p/*"]) {
+  app.use(path, webdavCors)
+}
 
 /**
  * 静态资源 / SPA 壳路径：这些请求不应被存储配置错误拦截，
